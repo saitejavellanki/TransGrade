@@ -1,0 +1,56 @@
+{
+    "image_id": "handwritten_page_001",  
+    "words": [
+      {
+        "word": "1.",
+        "bbox": [x1, y1, x2, y2, x3, y3, x4, y4],
+        "page": 1,
+        "label": "answer_number"
+      },
+      {
+        "word": "What",
+        "bbox": [x1, y1, x2, y2, x3, y3, x4, y4],
+        "page": 1,
+        "label": "answer"
+      },
+      {
+        "word": "is",
+        "bbox": [x1, y1, x2, y2, x3, y3, x4, y4],
+        "page": 1,
+        "label": "answer"
+      },
+      {
+        "word": "2.",
+        "bbox": [x1, y1, x2, y2, x3, y3, x4, y4],
+        "page": 1,
+        "label": "answer_number"
+      },
+      {
+        "word": "Answer",
+        "bbox": [x1, y1, x2, y2, x3, y3, x4, y4],
+        "page": 1,
+        "label": "answer"
+      },
+      {
+        "word": "Subpoint",
+        "bbox": [x1, y1, x2, y2, x3, y3, x4, y4],
+        "page": 1,
+        "label": "subpoint_number"
+      },
+      {
+        "word": "1a",
+        "bbox": [x1, y1, x2, y2, x3, y3, x4, y4],
+        "page": 1,
+        "label": "answer_subpoint"
+      },
+      {
+        "word": "Answer",
+        "bbox": [x1, y1, x2, y2, x3, y3, x4, y4],
+        "page": 1,
+        "label": "answer_subpoint"
+      }
+    ],
+    "image_path": "path_to_image/handwritten_page_001.jpg",
+    "label": "exam_answer_script"
+  }
+  

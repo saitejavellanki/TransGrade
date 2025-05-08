@@ -1,0 +1,101 @@
+from flask import Flask, request, jsonify
+import requests
+import time
+from PIL import Image
+from transformers import LayoutLMv2Processor, LayoutLMv2ForTokenClassification
+import torch
+import io
+
+app = Flask(__name__)
+
+# Azure credentials
+subscription_key = '6b2uM74mq58QMzHkU50QsZwJXDVoUuklAi6fqiob6b7XiaCMR4zUJQQJ99BDACYeBjFXJ3w3AAAFACOGki3V'
+endpoint = 'https://vellan.cognitiveservices.azure.com/'
+read_url = endpoint + "vision/v3.2/read/analyze"
+
+# Initialize LayoutLMv2 processor and model
+# Initialize LayoutLMv2 processor and model
+processor = LayoutLMv2Processor.from_pretrained("microsoft/layoutlmv2-base-uncased", apply_ocr=False)
+model = LayoutLMv2ForTokenClassification.from_pretrained("microsoft/layoutlmv2-base-uncased")
+
+@app.route('/extract-text', methods=['POST'])
+def extract_text():
+    if 'image' not in request.files:
+        return jsonify({'error': 'No image uploaded'}), 400
+    
+    image = request.files['image']
+    
+    # Read the image data once and store it
+    image_data = image.read()
+    
+    # Send image to Azure Read API
+    headers = {
+        "Ocp-Apim-Subscription-Key": subscription_key,
+        "Content-Type": "application/octet-stream"
+    }
+    
+    response = requests.post(read_url, headers=headers, data=image_data)
+    
+    if response.status_code != 202:
+        return jsonify({'error': 'Azure Read API call failed', 'details': response.text}), 500
+    
+    operation_url = response.headers["Operation-Location"]
+    
+    # Polling for result
+    while True:
+        result = requests.get(operation_url, headers={"Ocp-Apim-Subscription-Key": subscription_key}).json()
+        if result["status"] in ["succeeded", "failed"]:
+            break
+        time.sleep(1)
+    
+    if result["status"] == "succeeded":
+        extracted_text = [
+            {
+                "text": line["text"],
+                "boundingBox": line["boundingBox"]
+            }
+            for line in result["analyzeResult"]["readResults"][0]["lines"]
+        ]
+        
+        # Prepare text and bounding boxes for LayoutLM
+        words = [line["text"] for line in extracted_text]
+        boxes = [convert_bbox_format(line["boundingBox"]) for line in extracted_text]
+        
+        # Use the stored image data for PIL
+        img = Image.open(io.BytesIO(image_data)).convert("RGB")
+        
+        encoding = processor(img, words, boxes=boxes, return_tensors="pt", padding="max_length", truncation=True)
+        
+        # Inference with LayoutLMv2 model
+        outputs = model(**encoding)
+        
+        # Get predicted token classification
+        predictions = torch.argmax(outputs.logits, dim=-1)
+        
+        # Mapping token predictions to words
+        labels = predictions[0].tolist()
+        extracted_labels = [model.config.id2label[label] for label in labels]
+        
+        return jsonify({
+            'extracted_text': extracted_text,
+            'predictions': extracted_labels
+        })
+    else:
+        return jsonify({'error': 'Text recognition failed'}), 500
+
+
+def convert_bbox_format(bounding_box):
+    """
+    Convert 8-point bounding box (from Azure) into 4-point (top-left, bottom-right).
+    """
+    x_coords = bounding_box[::2]
+    y_coords = bounding_box[1::2]
+    x0, y0 = min(x_coords), min(y_coords)
+    x1, y1 = max(x_coords), max(y_coords)
+
+    # Normalize to 0-1000 if needed by processor (optional, depends on your model)
+    return [x0, y0, x1, y1]
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
