@@ -66,6 +66,68 @@ def extract_text():
         return jsonify({'error': 'Text recognition failed'}), 500
 
 
+@app.route('/word-level', methods=['POST'])
+def word_level_extraction():
+    """
+    Extract text with word-level bounding boxes using Azure Read API
+    """
+    if 'image' not in request.files:
+        return jsonify({'error': 'No image uploaded'}), 400
+    
+    image = request.files['image']
+    
+    # Read the image data once
+    image_data = image.read()
+    
+    # Send image to Azure Read API
+    headers = {
+        "Ocp-Apim-Subscription-Key": subscription_key,
+        "Content-Type": "application/octet-stream"
+    }
+    
+    response = requests.post(read_url, headers=headers, data=image_data)
+    
+    if response.status_code != 202:
+        return jsonify({'error': 'Azure Read API call failed', 'details': response.text}), 500
+    
+    operation_url = response.headers["Operation-Location"]
+    
+    # Polling for result
+    while True:
+        result = requests.get(operation_url, headers={"Ocp-Apim-Subscription-Key": subscription_key}).json()
+        if result["status"] in ["succeeded", "failed"]:
+            break
+        time.sleep(1)
+    
+    if result["status"] == "succeeded":
+        # Extract word-level data
+        word_data = []
+        word_id = 0
+        
+        for page_result in result["analyzeResult"]["readResults"]:
+            for line in page_result["lines"]:
+                line_text = line["text"]
+                
+                if "words" in line:
+                    for word in line["words"]:
+                        word_info = {
+                            "id": word_id,
+                            "text": word["text"],
+                            "boundingBox": convert_bbox_format(word["boundingBox"]),
+                            "confidence": word.get("confidence", None),
+                            "line_text": line_text
+                        }
+                        word_data.append(word_info)
+                        word_id += 1
+        
+        return jsonify({
+            'word_data': word_data,
+            'total_words': len(word_data)
+        })
+    else:
+        return jsonify({'error': 'Text recognition failed'}), 500
+
+
 def convert_bbox_format(bounding_box):
     """
     Convert 8-point bounding box (from Azure) into 4-point (top-left, bottom-right).
