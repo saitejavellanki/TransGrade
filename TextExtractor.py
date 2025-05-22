@@ -1,10 +1,14 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import requests
 import time
 from PIL import Image
 import io
 
 app = Flask(__name__)
+
+# Enable CORS for all routes and origins
+CORS(app, origins="*")
 
 # Azure credentials
 subscription_key = '6b2uM74mq58QMzHkU50QsZwJXDVoUuklAi6fqiob6b7XiaCMR4zUJQQJ99BDACYeBjFXJ3w3AAAFACOGki3V'
